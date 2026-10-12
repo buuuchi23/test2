@@ -32,6 +32,8 @@ export function toast(message) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+let openSheets = 0;
+
 // 下からせり上がるシート。close() を返す
 export function openSheet(title, body, { onClose } = {}) {
   const backdrop = h('div', { class: 'sheet-backdrop' });
@@ -42,6 +44,7 @@ export function openSheet(title, body, { onClose } = {}) {
   );
   backdrop.append(sheet);
   document.body.append(backdrop);
+  openSheets++;
   document.body.classList.add('no-scroll');
   requestAnimationFrame(() => backdrop.classList.add('open'));
 
@@ -50,7 +53,7 @@ export function openSheet(title, body, { onClose } = {}) {
     if (closed) return;
     closed = true;
     backdrop.classList.remove('open');
-    document.body.classList.remove('no-scroll');
+    if (--openSheets === 0) document.body.classList.remove('no-scroll');
     setTimeout(() => backdrop.remove(), 200);
     onClose && onClose();
   };
@@ -82,4 +85,76 @@ export function emptyState(emoji, text, ...actions) {
     h('p', {}, text),
     actions.length ? h('div', { class: 'btn-col' }, actions) : null,
   );
+}
+
+// ラベル付きの入力欄
+export function field(label, control, hint) {
+  return h('label', { class: 'field' },
+    h('span', { class: 'field-label' }, label),
+    control,
+    hint ? h('span', { class: 'field-hint' }, hint) : null,
+  );
+}
+
+// ボタン型の選択肢。multi=false なら1つだけ（もう一度押すと解除できるのは allowNone のとき）
+// 戻り値の .value で選択中の値（multi なら配列）
+export function chips(options, { value = null, multi = false, allowNone = true, onChange } = {}) {
+  let selected = multi ? new Set(value || []) : value;
+  const el = h('div', { class: 'chips', role: multi ? 'group' : 'radiogroup' });
+  const buttons = options.map((o) => {
+    const b = h('button', { type: 'button', class: 'chip' }, o.label);
+    b.addEventListener('click', () => {
+      if (multi) {
+        selected.has(o.v) ? selected.delete(o.v) : selected.add(o.v);
+      } else {
+        selected = selected === o.v && allowNone ? null : o.v;
+      }
+      sync();
+      onChange && onChange(api.value);
+    });
+    return [o.v, b];
+  });
+  const sync = () => {
+    for (const [v, b] of buttons) {
+      const on = multi ? selected.has(v) : selected === v;
+      b.classList.toggle('on', on);
+      b.setAttribute(multi ? 'aria-pressed' : 'aria-checked', on ? 'true' : 'false');
+      if (!multi) b.setAttribute('role', 'radio');
+    }
+  };
+  el.append(...buttons.map(([, b]) => b));
+  sync();
+  const api = {
+    el,
+    get value() { return multi ? [...selected] : selected; },
+  };
+  return api;
+}
+
+// セレクトボックス
+export function select(options, value) {
+  const el = h('select', { class: 'input' },
+    options.map((o) => h('option', { value: o.v }, o.label)));
+  if (value != null) el.value = value;
+  return el;
+}
+
+// Enter で決定する小さな入力行（例：カテゴリを新しく作る）
+export function inlineAdd(placeholder, buttonLabel, onSubmit) {
+  const input = h('input', { type: 'text', class: 'input', placeholder, enterkeyhint: 'done' });
+  const submit = async () => {
+    const v = input.value.trim();
+    if (!v) { input.focus(); return; }
+    try {
+      await onSubmit(v);
+      input.value = '';
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); }
+  });
+  return h('div', { class: 'inline-add' }, input,
+    h('button', { type: 'button', class: 'btn btn-small btn-outline', onclick: submit }, buttonLabel));
 }

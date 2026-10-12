@@ -35,7 +35,10 @@ export async function render() {
   if (!ROUTES[name]) name = DEFAULT_ROUTE;
 
   const setupDone = await getMeta('setupDone', false);
-  if (!setupDone && name !== 'setup') name = 'setup';
+  if (!setupDone && name !== 'setup') {
+    name = 'setup';
+    history.replaceState(null, '', '#/setup');
+  }
 
   const view = ROUTES[name];
   const frag = document.createDocumentFragment();
