@@ -321,7 +321,9 @@ select.input {
 }
 
 /* ===== リスト ===== */
-.sticky-actions { margin-top: 4px; }
+.list-actions { margin-top: 4px; flex-wrap: wrap; }
+.list-actions > .btn { flex: 1 1 auto; white-space: nowrap; padding: 10px 12px; font-size: 15px; }
+@media (max-width: 380px) { .list-actions > .btn { font-size: 14px; } }
 .cat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cat-head .card-title { margin: 0; }
 .count { color: var(--muted); font-weight: 400; font-size: 14px; }

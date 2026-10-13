@@ -1,7 +1,7 @@
-// 編集用のシート（やりたいこと・一括登録・タスク）
+// 編集用のシート（カテゴリ・やりたいこと・一括登録・タスク）
 import { h, field, chips, select, inlineAdd, openSheet, confirmDialog, toast } from './ui.js';
 import {
-  MINUTES, ENERGY, createCategory, saveWish, deleteWish, setExcluded,
+  MINUTES, ENERGY, createCategory, renameCategory, deleteCategory, saveWish, deleteWish, setExcluded,
   parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel,
 } from './data.js';
 
@@ -20,18 +20,49 @@ function noCategoryNotice(categories, reopen) {
   );
 }
 
-// やりたいことの追加・編集
-export function openWishEditor(wish, { categories, categoryId, onSaved }) {
-  const isNew = !wish;
-  const w = wish || { categoryId };
+// カテゴリの追加・名前変更・削除
+export function openCategoryEditor(category, wishCount, { onSaved }) {
+  const isNew = !category;
+  const name = h('input', { type: 'text', class: 'input', value: category ? category.name : '', placeholder: '例：運動・健康', enterkeyhint: 'done' });
   let close;
-  const reopen = () => { close(); openWishEditor(wish, { categories, categoryId, onSaved }); };
+  const save = async () => {
+    try {
+      if (isNew) await createCategory(name.value);
+      else await renameCategory(category.id, name.value);
+      toast(isNew ? '追加しました' : '保存しました');
+      close();
+    } catch (err) {
+      toast(err.message);
+      name.focus();
+    }
+  };
+  name.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } });
+  close = openSheet(isNew ? 'カテゴリを追加' : 'カテゴリを編集', h('div', { class: 'form' },
+    field('カテゴリ名', name),
+    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, isNew ? '追加する' : '保存する'),
+    isNew ? null : h('button', {
+      type: 'button', class: 'btn btn-block btn-ghost text-danger',
+      onclick: async () => {
+        const msg = wishCount
+          ? `「${category.name}」を削除しますか？\n中のやりたいこと${wishCount}件は「その他」に移ります。`
+          : `「${category.name}」を削除しますか？`;
+        if (!(await confirmDialog(msg, { ok: '削除する', danger: true }))) return;
+        try {
+          const moved = await deleteCategory(category.id);
+          toast(moved ? `削除して、${moved}件を「その他」に移しました` : '削除しました');
+          close();
+        } catch (err) {
+          toast(err.message);
+        }
+      },
+    }, '削除する'),
+  ), { onClose: onSaved });
+  if (isNew) setTimeout(() => name.focus(), 250);
+}
 
-  if (!categories.length) {
-    close = openSheet('やりたいことを追加', noCategoryNotice(categories, reopen), { onClose: onSaved });
-    return;
-  }
-
+// やりたいこと1件ぶんの入力欄。onDone は保存後に呼ばれる
+function wishForm(w, categories, onDone) {
+  const isNew = !w.id;
   const title = h('input', { type: 'text', class: 'input', value: w.title || '', placeholder: '例：NISAの本を1章読む', enterkeyhint: 'done' });
   const cat = categorySelect(categories, w.categoryId);
   const minutes = chips(MINUTES, { value: w.minutes ?? null });
@@ -43,35 +74,16 @@ export function openWishEditor(wish, { categories, categoryId, onSaved }) {
     try {
       await saveWish({ ...w, title: title.value, categoryId: cat.value, minutes: minutes.value, energy: energy.value, memo: memo.value });
       toast(isNew ? '登録しました' : '保存しました');
-      close();
+      onDone();
     } catch (err) {
       toast(err.message);
       title.focus();
     }
   };
   title.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); title.blur(); } });
+  if (isNew) setTimeout(() => title.focus(), 250);
 
-  const extra = isNew ? null : h('div', { class: 'btn-col' },
-    h('button', {
-      type: 'button', class: 'btn btn-ghost',
-      onclick: async () => {
-        await setExcluded(w.id, !w.excluded);
-        toast(w.excluded ? 'おすすめに戻しました' : 'おすすめから外しました');
-        close();
-      },
-    }, w.excluded ? '↩︎ おすすめに戻す' : '🙆 もういい（おすすめから外す）'),
-    h('button', {
-      type: 'button', class: 'btn btn-ghost text-danger',
-      onclick: async () => {
-        if (!(await confirmDialog(`「${w.title}」を削除しますか？`, { ok: '削除する', danger: true }))) return;
-        await deleteWish(w.id);
-        toast('削除しました');
-        close();
-      },
-    }, '削除する'),
-  );
-
-  close = openSheet(isNew ? 'やりたいことを追加' : 'やりたいことを編集', h('div', { class: 'form' },
+  return [
     field('タイトル（必須）', title),
     field('カテゴリ', cat),
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, '目安時間'), minutes.el,
@@ -80,51 +92,93 @@ export function openWishEditor(wish, { categories, categoryId, onSaved }) {
       h('span', { class: 'field-hint' }, '選ばないと「どれでも」扱いになります')),
     field('メモ', memo),
     h('button', { type: 'button', class: 'btn btn-block', onclick: save }, isNew ? '登録する' : '保存する'),
-    extra,
-  ), { onClose: onSaved });
-  if (isNew) setTimeout(() => title.focus(), 250);
+  ];
 }
 
-// 1行1件でまとめて登録
-export function openBulkAdd({ categories, categoryId, onSaved }) {
-  let close;
-  const reopen = () => { close(); openBulkAdd({ categories, categoryId, onSaved }); };
-  if (!categories.length) {
-    close = openSheet('まとめて追加', noCategoryNotice(categories, reopen), { onClose: onSaved });
-    return;
-  }
+// 1行1件でまとめて登録する入力欄
+function bulkForm(categories, categoryId, onDone) {
   const text = h('textarea', {
     class: 'input', rows: 8,
     placeholder: 'NISAの本を1章読む\n英単語を20個覚える\n散歩しながら写真を撮る',
   });
   const cat = categorySelect(categories, categoryId);
   const submit = h('button', { type: 'button', class: 'btn btn-block', disabled: true }, '登録する');
-  const update = () => {
+  text.addEventListener('input', () => {
     const n = parseBulk(text.value).length;
     submit.disabled = n === 0;
     submit.textContent = n ? `${n}件を登録する` : '登録する';
-  };
-  text.addEventListener('input', update);
+  });
   submit.addEventListener('click', async () => {
     const titles = parseBulk(text.value);
     if (!titles.length) return;
     try {
       await addWishes(titles, cat.value);
       toast(`${titles.length}件を登録しました`);
-      close();
+      onDone();
     } catch (err) {
       toast(err.message);
     }
   });
-  close = openSheet('まとめて追加', h('div', { class: 'form' },
-    field('やりたいこと（1行に1つ）', text, 'メモ帳などからそのまま貼り付けられます。空の行は無視されます。'),
+  setTimeout(() => text.focus(), 250);
+  return [
+    field('やりたいこと（1行に1つ）', text, 'メモ帳などからそのまま貼り付けられます。空の行や前後の空白は無視されます。'),
     field('カテゴリ', cat),
     h('p', { class: 'muted small' }, '目安時間・元気度は、あとから1件ずつ設定できます。'),
     submit,
-  ), { onClose: onSaved });
-  setTimeout(() => text.focus(), 250);
+  ];
 }
 
+// やりたいことを登録（1件ずつ／まとめて）
+export function openWishRegister({ categories, categoryId, onSaved, mode = 'single' }) {
+  let close;
+  if (!categories.length) {
+    close = openSheet('やりたいことを登録', noCategoryNotice(categories, () => {
+      close();
+      openWishRegister({ categories, categoryId, onSaved, mode });
+    }), { onClose: onSaved });
+    return;
+  }
+  const done = () => close();
+  const content = h('div', { class: 'form' });
+  const show = (m) => content.replaceChildren(...(m === 'bulk'
+    ? bulkForm(categories, categoryId, done)
+    : wishForm({ categoryId }, categories, done)));
+  const tabs = chips([{ v: 'single', label: '✏️ 1件ずつ' }, { v: 'bulk', label: '📋 まとめて' }], {
+    value: mode, allowNone: false, onChange: show,
+  });
+  tabs.el.classList.add('tabs');
+  show(mode);
+  close = openSheet('やりたいことを登録', h('div', { class: 'form' }, tabs.el, content), { onClose: onSaved });
+}
+
+// やりたいことの編集（新規のときは登録シートを開く）
+export function openWishEditor(wish, { categories, categoryId, onSaved }) {
+  if (!wish) { openWishRegister({ categories, categoryId, onSaved }); return; }
+  let close;
+  const done = () => close();
+  close = openSheet('やりたいことを編集', h('div', { class: 'form' },
+    wishForm(wish, categories, done),
+    h('div', { class: 'btn-col' },
+      h('button', {
+        type: 'button', class: 'btn btn-ghost',
+        onclick: async () => {
+          await setExcluded(wish.id, !wish.excluded);
+          toast(wish.excluded ? 'おすすめに戻しました' : 'おすすめから外しました');
+          close();
+        },
+      }, wish.excluded ? '↩︎ おすすめに戻す' : '🙆 もういい（おすすめから外す）'),
+      h('button', {
+        type: 'button', class: 'btn btn-ghost text-danger',
+        onclick: async () => {
+          if (!(await confirmDialog(`「${wish.title}」を削除しますか？`, { ok: '削除する', danger: true }))) return;
+          await deleteWish(wish.id);
+          toast('削除しました');
+          close();
+        },
+      }, '削除する'),
+    ),
+  ), { onClose: onSaved });
+}
 
 // タスクを追加（やりたいことリストから選ぶ／新しく入力）
 export function openTaskAdder({ categories, wishes, busyWishIds = new Set(), onSaved }) {
