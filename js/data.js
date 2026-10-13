@@ -186,3 +186,13 @@ export async function deleteTask(id) {
 // ---- 今日のおすすめ（日ごとに保存） ----
 export const loadDailyPick = (date) => get('dailyPicks', date);
 export const saveDailyPick = (pick) => put('dailyPicks', pick);
+
+// ---- 休息日 ----
+export async function loadRestDays() {
+  return new Set((await getAll('dayLogs')).filter((d) => d.rest).map((d) => d.date));
+}
+
+export async function setRest(date, rest) {
+  if (rest) await put('dayLogs', { date, rest: true });
+  else await del('dayLogs', date);
+}

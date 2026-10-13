@@ -18,6 +18,8 @@
   --heat-2: #8fd0a2;
   --heat-3: #57b276;
   --heat-4: #2f8a52;
+  --heat-ink-hi: #ffffff;
+  --heat-ink-3: #1f3a28;
   --shadow: 0 2px 10px rgba(120, 80, 50, 0.08);
   --radius: 16px;
   --tap: 48px;
@@ -45,6 +47,8 @@
     --heat-2: #3b7a4f;
     --heat-3: #4fa167;
     --heat-4: #74c48f;
+    --heat-ink-hi: #10261a;
+    --heat-ink-3: #10261a;
     --shadow: none;
   }
 }
@@ -465,3 +469,71 @@ select.input {
 /* ===== タスク追加のリスト ===== */
 .pick-group { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 .row-plus { color: var(--accent); font-size: 22px; padding: 0 6px; }
+
+/* ===== 連続記録（今日の画面） ===== */
+.streak-card { display: flex; flex-direction: column; gap: 6px; }
+.streak-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.streak-num { display: flex; flex-direction: column; }
+.streak-label { font-size: 13px; color: var(--muted); font-weight: 700; }
+.streak-value { font-size: 40px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.streak-value small, .tile-value small { font-size: 15px; font-weight: 700; margin-left: 2px; color: var(--muted); }
+.streak-best { font-size: 14px; color: var(--muted); padding-bottom: 6px; }
+.streak-msg { font-size: 14px; margin: 0; }
+.streak-card .btn { align-self: flex-start; margin-top: 4px; }
+
+/* ===== 記録：数字のまとめ ===== */
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 12px 0; }
+@media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+.tile { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; }
+.tile-label { font-size: 12px; color: var(--muted); font-weight: 700; }
+.tile-value { font-size: 28px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+/* ===== 記録：カレンダー ===== */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-head .card-title { margin: 0; }
+.icon-btn:disabled { opacity: 0.3; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-week span { text-align: center; font-size: 12px; color: var(--muted); padding: 2px 0; }
+.cal-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: var(--heat-0);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.cal-cell.blank { background: none; cursor: default; }
+.heat-0 { background: var(--heat-0); }
+.heat-1 { background: var(--heat-1); }
+.heat-2 { background: var(--heat-2); }
+.heat-3 { background: var(--heat-3); color: var(--heat-ink-3); }
+.heat-4 { background: var(--heat-4); color: var(--heat-ink-hi); }
+.cal-cell.rest, .swatch.rest { background: var(--rest); color: var(--text); }
+.cal-mark { font-size: 11px; line-height: 1; }
+.cal-cell.today { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 800; }
+.cal-cell.future { background: transparent; color: var(--muted); opacity: 0.5; cursor: default; }
+.cal-cell.selected { outline: 3px solid var(--text); outline-offset: 1px; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.legend-rest { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.day-detail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.day-detail h3 { font-size: 15px; }
+
+/* ===== 記録：カテゴリ別 ===== */
+.chips.tabs.tabs-small { max-width: 240px; margin-bottom: 8px; }
+.chips.tabs.tabs-small .chip { min-height: 36px; padding: 4px 6px; font-size: 14px; }
+.bars { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: minmax(5em, 9em) 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 12px; background: var(--heat-0); border-radius: 4px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--heat-3); border-radius: 0 4px 4px 0; }
+.bar-n { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 3em; text-align: right; }

@@ -3,8 +3,9 @@ import { h, chips, toast, linkify, emptyState } from '../ui.js';
 import { todayKey, formatDay, keyOfTime, parseKey } from '../util.js';
 import {
   MINUTES, loadCategories, loadWishes, loadTasks, addTask, setTaskDone,
-  loadDailyPick, saveDailyPick, minutesLabel, energyLabel,
+  loadDailyPick, saveDailyPick, minutesLabel, energyLabel, loadRestDays, setRest,
 } from '../data.js';
+import { countByDay, currentStreak, longestStreak } from '../stats.js';
 import { pickWishes, MOODS } from '../picker.js';
 import { openWishEditor, openTaskAdder, openTaskEditor } from '../editors.js';
 
@@ -16,7 +17,7 @@ const conditionReady = (p) => p.mode !== 'condition' || (p.condition && p.condit
 
 export async function render(root, { rerender }) {
   const today = todayKey();
-  const [categories, wishes, tasks] = await Promise.all([loadCategories(), loadWishes(), loadTasks()]);
+  const [categories, wishes, tasks, restDays] = await Promise.all([loadCategories(), loadWishes(), loadTasks(), loadRestDays()]);
   const catName = new Map(categories.map((c) => [c.id, c.name]));
   const wishById = new Map(wishes.map((w) => [w.id, w]));
 
@@ -51,6 +52,34 @@ export async function render(root, { rerender }) {
   const addWish = () => openWishEditor(null, { categories, onSaved: rerender });
 
   root.append(h('p', { class: 'date-label' }, formatDay(today)));
+
+  // ---- 連続記録と「今日は休む」 ----
+  const counts = countByDay(tasks);
+  const streak = currentStreak(today, counts, restDays);
+  const best = longestStreak(today, counts, restDays);
+  const doneTodayCount = counts.get(today) || 0;
+  const isRest = restDays.has(today);
+  let streakMsg;
+  if (doneTodayCount) streakMsg = '今日も達成！この調子です 🎉';
+  else if (isRest) streakMsg = '今日は休息日。ゆっくり休んでね 🌙';
+  else if (streak) streakMsg = `今日1つ完了すると、${streak + 1}日連続になります`;
+  else streakMsg = '今日1つ完了して、記録をスタートしよう 🌱';
+  root.append(h('section', { class: 'card streak-card' },
+    h('div', { class: 'streak-main' },
+      h('div', { class: 'streak-num' },
+        h('span', { class: 'streak-label' }, '🔥 連続達成'),
+        h('span', { class: 'streak-value' }, String(streak), h('small', {}, '日'))),
+      h('div', { class: 'streak-best' }, `最長 ${best}日`)),
+    h('p', { class: 'streak-msg' }, streakMsg),
+    doneTodayCount ? null : h('button', {
+      type: 'button', class: isRest ? 'btn btn-small btn-ghost' : 'btn btn-small btn-outline rest-btn',
+      onclick: async () => {
+        await setRest(today, !isRest);
+        toast(isRest ? '休息日を取り消しました' : '今日は休息日にしました。連続記録は途切れません 🌙');
+        rerender();
+      },
+    }, isRest ? '休息日を取り消す' : '🌙 今日は休む'),
+  ));
 
   // ---- おすすめ ----
   const modeTabs = chips([{ v: 'auto', label: '🎲 おまかせ' }, { v: 'condition', label: '🎯 条件指定' }], {
