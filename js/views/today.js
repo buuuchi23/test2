@@ -178,7 +178,7 @@ export async function render(root, { rerender }) {
     taskCard.append(h('p', { class: 'muted' }, 'まだタスクはありません。おすすめから選んでみましょう 🌱'));
   } else {
     taskCard.append(h('ul', { class: 'task-list' }, all.map(taskRow)),
-      h('p', { class: 'muted small task-hint' }, '◯ をタップで完了。途中までなら「すすめた」で今日の分を記録できます。'));
+      h('p', { class: 'muted small task-hint' }, '終わったら左の ◯ をタップ（または「すすめた」→「最後までできた」）で完了です。途中までなら「すすめた」で今日の分を記録できます。'));
   }
   taskCard.append(h('button', {
     type: 'button', class: 'btn btn-block btn-ghost',

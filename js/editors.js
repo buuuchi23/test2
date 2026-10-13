@@ -2,7 +2,7 @@
 import { h, field, chips, select, inlineAdd, openSheet, confirmDialog, toast } from './ui.js';
 import {
   MINUTES, ENERGY, createCategory, renameCategory, deleteCategory, saveWish, deleteWish, setExcluded,
-  parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel, saveProgress, removeProgress,
+  parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel, saveProgress, removeProgress, setTaskDone,
 } from './data.js';
 import { parseKey } from './util.js';
 
@@ -310,8 +310,17 @@ export function openProgressSheet(task, today, { onSaved }) {
     h('p', { class: 'progress-task' }, task.title),
     last ? h('p', { class: 'muted small' }, `前回（${shortDate(last.date)}）：${last.note}`) : null,
     field('どこまでできた？', note),
-    h('p', { class: 'muted small' }, 'タスクは未完了のまま、明日以降も残ります。今日は達成日になります。'),
-    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, existing ? '保存する' : '記録する'),
+    h('p', { class: 'muted small' }, '「途中まで」はタスクが明日以降も残ります。どちらでも今日は達成日になります。'),
+    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, existing ? '保存する' : '途中まで（記録する）'),
+    h('button', {
+      type: 'button', class: 'btn btn-block btn-done',
+      onclick: async () => {
+        if (note.value.trim()) await saveProgress(task.id, today, note.value);
+        await setTaskDone(task.id, true);
+        toast('完了！おつかれさまでした 🎉');
+        close();
+      },
+    }, '🎉 最後までできた（完了にする）'),
     existing ? h('button', {
       type: 'button', class: 'btn btn-block btn-ghost text-danger',
       onclick: async () => {
