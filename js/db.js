@@ -6,7 +6,6 @@ const DB_VERSION = 1;
 
 // ストア名 → 主キー
 export const STORES = {
-  goals: 'id',
   categories: 'id',
   wishes: 'id',
   tasks: 'id',

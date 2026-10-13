@@ -39,7 +39,8 @@ export async function render(root, { rerender }) {
 
   if (!wishes.length) {
     root.append(h('section', { class: 'card' }, emptyState('🌱',
-      'やりたいことを登録しましょう。小さなことでも大丈夫です。メモ帳に書いたものを「まとめて追加」で貼り付けると、一気に登録できます。')));
+      'やりたいことを登録しましょう。小さなことでも大丈夫です。メモ帳に書いたものを「まとめて追加」で貼り付けると、一気に登録できます。',
+      h('button', { type: 'button', class: 'btn btn-block', onclick: () => bulk() }, '📋 まとめて追加する'))));
   } else {
     root.append(h('p', { class: 'muted small center' }, `おすすめ対象 ${active.length}件`));
   }

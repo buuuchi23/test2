@@ -1,7 +1,6 @@
-// 設定画面：なりたい姿・カテゴリの管理、データ
+// 設定画面：カテゴリの管理、データ
 import { h, field, openSheet, confirmDialog, toast } from '../ui.js';
-import { loadGoals, loadCategories, loadWishes, renameCategory, createCategory, deleteCategory } from '../data.js';
-import { openGoalEditor } from '../editors.js';
+import { loadCategories, loadWishes, renameCategory, createCategory, deleteCategory } from '../data.js';
 
 export const title = '設定';
 
@@ -53,30 +52,8 @@ function openCategoryEditor(category, wishCount, { onSaved }) {
 }
 
 export async function render(root, { rerender }) {
-  const [goals, categories, wishes] = await Promise.all([loadGoals(), loadCategories(), loadWishes()]);
-  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const [categories, wishes] = await Promise.all([loadCategories(), loadWishes()]);
   const countIn = (id) => wishes.filter((w) => w.categoryId === id).length;
-
-  // なりたい姿
-  root.append(h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, '🌟 なりたい姿'),
-    goals.length
-      ? h('ul', { class: 'row-list' }, goals.map((g) => {
-        const names = g.categoryIds.map((id) => catName.get(id)).filter(Boolean);
-        return h('li', {}, h('button', {
-          type: 'button', class: 'row-btn',
-          onclick: () => openGoalEditor(g, { categories, onSaved: rerender }),
-        },
-        h('span', { class: 'row-title' }, g.text),
-        h('span', { class: 'row-sub' }, names.length ? names.join('・') : 'カテゴリ未選択'),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
-      }))
-      : h('p', { class: 'muted' }, 'まだありません。なりたい姿を登録すると、関係するやりたいことがおすすめに出やすくなります。'),
-    h('button', {
-      type: 'button', class: 'btn btn-block btn-outline',
-      onclick: () => openGoalEditor(null, { categories, onSaved: rerender }),
-    }, '＋ なりたい姿を追加'),
-  ));
 
   // カテゴリ
   root.append(h('section', { class: 'card' },

@@ -1,4 +1,4 @@
-// なりたい姿・カテゴリ・やりたいことの読み書き
+// カテゴリ・やりたいことの読み書き
 import { getAll, get, put, del, transact, getMeta, setMeta } from './db.js';
 import { uid, nowISO } from './util.js';
 
@@ -49,8 +49,8 @@ const OTHER_NAME = 'その他';
 // カテゴリを削除する。中のやりたいこと・タスクは「その他」に移す
 // 戻り値：移した件数
 export async function deleteCategory(id) {
-  const [categories, wishes, tasks, goals] = await Promise.all([
-    getAll('categories'), getAll('wishes'), getAll('tasks'), getAll('goals'),
+  const [categories, wishes, tasks] = await Promise.all([
+    getAll('categories'), getAll('wishes'), getAll('tasks'),
   ]);
   const movingWishes = wishes.filter((w) => w.categoryId === id);
   const movingTasks = tasks.filter((t) => t.categoryId === id);
@@ -66,41 +66,17 @@ export async function deleteCategory(id) {
     : null;
   if (newOther) other = newOther;
 
-  await transact(['categories', 'wishes', 'tasks', 'goals', 'meta'], (s) => {
+  await transact(['categories', 'wishes', 'tasks', 'meta'], (s) => {
     if (newOther) {
       s.categories.put(newOther);
       s.meta.put({ key: 'otherCategoryId', value: newOther.id });
     }
     for (const w of movingWishes) s.wishes.put({ ...w, categoryId: other.id });
     for (const t of movingTasks) s.tasks.put({ ...t, categoryId: other.id });
-    for (const g of goals) {
-      if (g.categoryIds.includes(id)) s.goals.put({ ...g, categoryIds: g.categoryIds.filter((c) => c !== id) });
-    }
     s.categories.delete(id);
     if (otherId === id) s.meta.delete('otherCategoryId');
   });
   return movingWishes.length;
-}
-
-// ---- なりたい姿 ----
-export async function loadGoals() {
-  return (await getAll('goals')).sort(byCreated);
-}
-
-export async function saveGoal({ id, text, categoryIds = [] }) {
-  text = text.trim();
-  if (!text) throw new Error('なりたい姿を入れてください');
-  const old = id ? await get('goals', id) : null;
-  return put('goals', {
-    id: id || uid(),
-    text,
-    categoryIds: [...new Set(categoryIds)],
-    createdAt: old ? old.createdAt : nowISO(),
-  });
-}
-
-export async function deleteGoal(id) {
-  await del('goals', id);
 }
 
 // ---- やりたいこと ----

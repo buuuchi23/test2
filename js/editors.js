@@ -1,44 +1,9 @@
-// 編集用のシート（やりたいこと・一括登録・なりたい姿）と、カテゴリのチェック部品
+// 編集用のシート（やりたいこと・一括登録）
 import { h, field, chips, select, inlineAdd, openSheet, confirmDialog, toast } from './ui.js';
 import {
   MINUTES, ENERGY, createCategory, saveWish, deleteWish, setExcluded,
-  parseBulk, addWishes, saveGoal, deleteGoal,
+  parseBulk, addWishes,
 } from './data.js';
-
-// カテゴリをチェックで選ぶ部品（その場で新規作成もできる）
-// categories は呼び出し側と共有する配列。新規作成するとこの配列に追加される
-export function categoryPicker(categories, selectedIds = [], { onCreated } = {}) {
-  const selected = new Set(selectedIds);
-  const list = h('div', { class: 'chips' });
-  const draw = () => {
-    list.replaceChildren(...categories.map((c) => {
-      const b = h('button', { type: 'button', class: 'chip' }, c.name);
-      const sync = () => {
-        b.classList.toggle('on', selected.has(c.id));
-        b.setAttribute('aria-pressed', selected.has(c.id) ? 'true' : 'false');
-      };
-      b.addEventListener('click', () => {
-        selected.has(c.id) ? selected.delete(c.id) : selected.add(c.id);
-        sync();
-      });
-      sync();
-      return b;
-    }));
-  };
-  draw();
-  const adder = inlineAdd('新しいカテゴリ名', '＋ 作る', async (name) => {
-    const c = await createCategory(name);
-    if (!categories.some((x) => x.id === c.id)) categories.push(c);
-    selected.add(c.id);
-    draw();
-    onCreated && onCreated(c);
-  });
-  return {
-    el: h('div', { class: 'cat-picker' }, list, adder),
-    get value() { return [...selected].filter((id) => categories.some((c) => c.id === id)); },
-    refresh: draw,
-  };
-}
 
 function categorySelect(categories, value) {
   return select(categories.map((c) => ({ v: c.id, label: c.name })), value || (categories[0] && categories[0].id));
@@ -160,38 +125,3 @@ export function openBulkAdd({ categories, categoryId, onSaved }) {
   setTimeout(() => text.focus(), 250);
 }
 
-// なりたい姿の追加・編集
-export function openGoalEditor(goal, { categories, onSaved }) {
-  const isNew = !goal;
-  const text = h('input', { type: 'text', class: 'input', value: goal ? goal.text : '', placeholder: '例：お金の知識がある人', enterkeyhint: 'done' });
-  const picker = categoryPicker(categories, goal ? goal.categoryIds : []);
-  let close;
-  const save = async () => {
-    try {
-      await saveGoal({ id: goal && goal.id, text: text.value, categoryIds: picker.value });
-      toast(isNew ? '追加しました' : '保存しました');
-      close();
-    } catch (err) {
-      toast(err.message);
-      text.focus();
-    }
-  };
-  close = openSheet(isNew ? 'なりたい姿を追加' : 'なりたい姿を編集', h('div', { class: 'form' },
-    field('なりたい姿', text),
-    h('div', { class: 'field' },
-      h('span', { class: 'field-label' }, '関係するカテゴリ'),
-      h('span', { class: 'field-hint' }, 'ここで選んだカテゴリのやりたいことが、おすすめに出やすくなります'),
-      picker.el),
-    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, isNew ? '追加する' : '保存する'),
-    isNew ? null : h('button', {
-      type: 'button', class: 'btn btn-block btn-ghost text-danger',
-      onclick: async () => {
-        if (!(await confirmDialog(`「${goal.text}」を削除しますか？\nカテゴリとやりたいことはそのまま残ります。`, { ok: '削除する', danger: true }))) return;
-        await deleteGoal(goal.id);
-        toast('削除しました');
-        close();
-      },
-    }, '削除する'),
-  ), { onClose: onSaved });
-  if (isNew) setTimeout(() => text.focus(), 250);
-}
