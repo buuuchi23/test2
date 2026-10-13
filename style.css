@@ -470,7 +470,6 @@ select.input {
 
 /* ===== タスク追加のリスト ===== */
 .pick-group { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
-.row-plus { color: var(--accent); font-size: 22px; padding: 0 6px; }
 
 /* ===== 連続記録（今日の画面） ===== */
 .streak-card { display: flex; flex-direction: column; gap: 6px; }
@@ -564,3 +563,10 @@ select.input {
 .ph-date { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3em; }
 .btn-done { background: var(--green); color: #fff; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ===== 今日：タスク一覧 ===== */
+.list-lead { margin: 12px 0 0; }
+.today-group .pick-group { margin-top: 14px; color: var(--accent); font-weight: 700; }
+.today-row .wish-main { cursor: default; }
+.today-row .btn-small { flex-shrink: 0; }
+.today-row .pick-state { min-height: 40px; max-width: none; white-space: nowrap; }

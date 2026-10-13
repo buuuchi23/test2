@@ -7,7 +7,7 @@ import {
 } from '../data.js';
 import { countByDay, currentStreak, longestStreak } from '../stats.js';
 import { pickWishes, MOODS } from '../picker.js';
-import { openWishEditor, openTaskAdder, openTaskEditor, openProgressSheet } from '../editors.js';
+import { openWishEditor, openTaskEditor, openProgressSheet } from '../editors.js';
 
 export const title = '今日';
 
@@ -38,11 +38,13 @@ export async function render(root, { rerender }) {
     wishIds: pickWishes(candidates, { today, condition: pick.mode === 'condition' ? pick.condition : null, avoidIds }),
   });
 
-  // その日最初に開いたときに3件決めて保存。中身が全部なくなっていたら選び直す
+  // 表示モード（📝タスク一覧／🎯条件指定）は日ごとに保存。条件指定の3件も保存して、中身が全部なくなっていたら選び直す
   let pick = await loadDailyPick(today);
   if (!pick) {
-    pick = generate({ date: today, mode: 'auto', condition: null });
+    pick = { date: today, mode: 'list', condition: null, wishIds: [] };
     await saveDailyPick(pick);
+  } else if (pick.mode !== 'condition') {
+    pick = { ...pick, mode: 'list' }; // 以前の「おまかせ」は一覧として表示
   } else if (conditionReady(pick) && !pick.wishIds.some(isShowable) && candidates.length) {
     const next = generate(pick);
     if (next.wishIds.length) { pick = next; await saveDailyPick(pick); }
@@ -82,10 +84,10 @@ export async function render(root, { rerender }) {
   ));
 
   // ---- おすすめ ----
-  const modeTabs = chips([{ v: 'auto', label: '🎲 おまかせ' }, { v: 'condition', label: '🎯 条件指定' }], {
+  const modeTabs = chips([{ v: 'list', label: '📝 タスク一覧' }, { v: 'condition', label: '🎯 条件指定' }], {
     value: pick.mode, allowNone: false,
     onChange: (mode) => {
-      if (mode === 'auto') update(generate({ ...pick, mode: 'auto', condition: null }));
+      if (mode === 'list') update({ ...pick, mode: 'list' });
       else {
         const p = { ...pick, mode: 'condition', condition: pick.condition || { minutes: null, mood: null } };
         update(conditionReady(p) ? generate(p) : p);
@@ -112,7 +114,22 @@ export async function render(root, { rerender }) {
     ));
   }
 
-  if (!conditionReady(pick)) {
+  if (pick.mode === 'list') {
+    // やりたいことリストを全部並べて、ここから今日のタスクにする
+    if (!activeWishes.length) {
+      recCard.append(emptyState('🌱', 'やりたいことリストが空っぽです。まずは1つ登録してみましょう。',
+        h('button', { type: 'button', class: 'btn btn-block', onclick: addWish }, '＋ やりたいことを追加する')));
+    } else {
+      const groups = categories.map((c) => [c, activeWishes.filter((w) => w.categoryId === c.id)]).filter(([, ws]) => ws.length);
+      const known = new Set(categories.map((c) => c.id));
+      const orphans = activeWishes.filter((w) => !known.has(w.categoryId));
+      if (orphans.length) groups.push([{ name: 'カテゴリなし' }, orphans]);
+      recCard.append(h('p', { class: 'muted small list-lead' }, 'やりたいことリストから、今日やるものを選んでタスクにしましょう。'),
+        ...groups.map(([c, ws]) => h('div', { class: 'today-group' },
+          h('h3', { class: 'pick-group' }, c.name),
+          h('ul', { class: 'wish-list' }, ws.map(listRow)))));
+    }
+  } else if (!conditionReady(pick)) {
     recCard.append(h('p', { class: 'muted center hint' }, '空き時間と気分を選ぶと、合うものを3つ選びます 👆'));
   } else {
     const ids = pick.wishIds.filter(isShowable);
@@ -126,8 +143,7 @@ export async function render(root, { rerender }) {
     } else {
       recCard.append(h('ul', { class: 'picks' }, ids.map((id) => pickCard(wishById.get(id)))));
       if (ids.length < 3) {
-        recCard.append(h('p', { class: 'muted small center' },
-          pick.mode === 'condition' ? '条件に合うのは、いまはこれだけでした。' : 'おすすめできるのは、いまはこれだけでした。'),
+        recCard.append(h('p', { class: 'muted small center' }, '条件に合うのは、いまはこれだけでした。'),
         h('button', { type: 'button', class: 'btn btn-block btn-ghost', onclick: addWish }, '＋ やりたいことを追加する'));
       }
       recCard.append(h('button', {
@@ -138,26 +154,39 @@ export async function render(root, { rerender }) {
   }
   root.append(recCard);
 
-  function pickCard(w) {
-    const meta = [
+  function metaOf(w) {
+    return [
       w.minutes ? `⏱ ${minutesLabel(w.minutes)}` : null,
       w.energy ? `🔋 ${energyLabel(w.energy)}` : null,
     ].filter(Boolean);
-    let action;
-    if (busyWishIds.has(w.id)) {
-      action = h('span', { class: 'pick-state' }, '✓ タスクに追加済み');
-    } else if (doneTodayWishIds.has(w.id)) {
-      action = h('span', { class: 'pick-state done' }, '🎉 今日やりました');
-    } else {
-      action = h('button', {
-        type: 'button', class: 'btn btn-small',
-        onclick: async () => {
-          await addTask({ title: w.title, categoryId: w.categoryId, wishId: w.id });
-          toast('今日のタスクに追加しました');
-          rerender();
-        },
-      }, '＋ タスクにする');
-    }
+  }
+
+  // 「＋タスクにする」ボタン（すでにタスクなら状態を表示）
+  function actionFor(w) {
+    if (busyWishIds.has(w.id)) return h('span', { class: 'pick-state' }, '✓ 追加済み');
+    if (doneTodayWishIds.has(w.id)) return h('span', { class: 'pick-state done' }, '🎉 今日やった');
+    return h('button', {
+      type: 'button', class: 'btn btn-small',
+      onclick: async () => {
+        await addTask({ title: w.title, categoryId: w.categoryId, wishId: w.id });
+        toast('今日のタスクに追加しました');
+        rerender();
+      },
+    }, '＋ タスクにする');
+  }
+
+  function listRow(w) {
+    const meta = metaOf(w);
+    return h('li', { class: 'wish-row today-row' },
+      h('div', { class: 'wish-main' },
+        h('span', { class: 'wish-title' }, w.title),
+        meta.length ? h('span', { class: 'wish-meta' }, meta.join('　')) : null),
+      actionFor(w));
+  }
+
+  function pickCard(w) {
+    const meta = metaOf(w);
+    const action = actionFor(w);
     return h('li', { class: 'pick' },
       h('span', { class: 'pick-cat' }, catName.get(w.categoryId) || ''),
       h('span', { class: 'pick-title' }, w.title),
@@ -175,15 +204,11 @@ export async function render(root, { rerender }) {
       all.length ? h('span', { class: 'muted small' }, `${doneToday.length} / ${all.length} 完了`) : null),
   );
   if (!all.length) {
-    taskCard.append(h('p', { class: 'muted' }, 'まだタスクはありません。おすすめから選んでみましょう 🌱'));
+    taskCard.append(h('p', { class: 'muted' }, 'まだタスクはありません。上の「今日のおすすめ」から選んでみましょう 🌱'));
   } else {
     taskCard.append(h('ul', { class: 'task-list' }, all.map(taskRow)),
       h('p', { class: 'muted small task-hint' }, '終わったら左の ◯ をタップ（または「すすめた」→「最後までできた」）で完了です。途中までなら「すすめた」で今日の分を記録できます。'));
   }
-  taskCard.append(h('button', {
-    type: 'button', class: 'btn btn-block btn-ghost',
-    onclick: () => openTaskAdder({ categories, wishes, busyWishIds, onSaved: rerender }),
-  }, '＋ タスクを追加'));
   root.append(taskCard);
 
   function taskRow(t) {
