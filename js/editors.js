@@ -2,8 +2,11 @@
 import { h, field, chips, select, inlineAdd, openSheet, confirmDialog, toast } from './ui.js';
 import {
   MINUTES, ENERGY, createCategory, renameCategory, deleteCategory, saveWish, deleteWish, setExcluded,
-  parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel,
+  parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel, saveProgress, removeProgress,
 } from './data.js';
+import { parseKey } from './util.js';
+
+const shortDate = (key) => { const d = parseKey(key); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 function categorySelect(categories, value) {
   return select(categories.map((c) => ({ v: c.id, label: c.name })), value || (categories[0] && categories[0].id));
@@ -269,9 +272,15 @@ export function openTaskEditor(task, { categories, onSaved }) {
       toast(err.message);
     }
   };
+  const history = (task.progress || []).slice().reverse();
   close = openSheet('タスクを編集', h('div', { class: 'form' },
     field('タスク', title),
     field('カテゴリ', cat),
+    history.length ? h('div', { class: 'field' },
+      h('span', { class: 'field-label' }, '📝 すすめた記録'),
+      h('ul', { class: 'progress-history' }, history.map((p) => h('li', {},
+        h('span', { class: 'ph-date' }, shortDate(p.date)),
+        h('span', {}, p.note || 'すすめた'))))) : null,
     h('button', { type: 'button', class: 'btn btn-block', onclick: save }, '保存する'),
     h('button', {
       type: 'button', class: 'btn btn-block btn-ghost text-danger',
@@ -282,5 +291,34 @@ export function openTaskEditor(task, { categories, onSaved }) {
         close();
       },
     }, '削除する'),
+  ), { onClose: onSaved });
+}
+
+// 「今日すすめた」の記録（ひと言メモつき）
+export function openProgressSheet(task, today, { onSaved }) {
+  const existing = (task.progress || []).find((p) => p.date === today);
+  const last = (task.progress || []).filter((p) => p.date !== today && p.note).slice(-1)[0];
+  const note = h('textarea', { class: 'input', rows: 2, placeholder: '例：3章まで読んだ（なくてもOK）' });
+  note.value = existing ? existing.note : '';
+  let close;
+  const save = async () => {
+    await saveProgress(task.id, today, note.value);
+    toast(existing ? '記録を直しました' : '記録しました。えらい！🌱');
+    close();
+  };
+  close = openSheet('今日すすめた', h('div', { class: 'form' },
+    h('p', { class: 'progress-task' }, task.title),
+    last ? h('p', { class: 'muted small' }, `前回（${shortDate(last.date)}）：${last.note}`) : null,
+    field('どこまでできた？', note),
+    h('p', { class: 'muted small' }, 'タスクは未完了のまま、明日以降も残ります。今日は達成日になります。'),
+    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, existing ? '保存する' : '記録する'),
+    existing ? h('button', {
+      type: 'button', class: 'btn btn-block btn-ghost text-danger',
+      onclick: async () => {
+        await removeProgress(task.id, today);
+        toast('今日の記録を取り消しました');
+        close();
+      },
+    }, '今日の記録を取り消す') : null,
   ), { onClose: onSaved });
 }

@@ -1,16 +1,21 @@
 // 達成記録の計算（ヒートマップ・ストリーク・カテゴリ別）
-//  - 1日1件以上完了 → 達成日
+//  - 1日1件以上「完了」または「すすめた」 → 達成日
 //  - 休息日はストリークが途切れないが、日数には数えない
 //  - 今日まだ達成していないときは、昨日までの連続を表示する
 import { addDays, keyOfTime } from './util.js';
 
-// 日付ごとの完了数
+// そのタスクに取り組んだ日（完了した日＋すすめた日）
+export function activeDays(task) {
+  const days = new Set((task.progress || []).map((p) => p.date));
+  if (task.completedAt) days.add(keyOfTime(task.completedAt));
+  return days;
+}
+
+// 日付ごとの「取り組んだタスクの数」（同じタスクは1日1回だけ数える）
 export function countByDay(tasks) {
   const map = new Map();
   for (const t of tasks) {
-    if (!t.completedAt) continue;
-    const k = keyOfTime(t.completedAt);
-    map.set(k, (map.get(k) || 0) + 1);
+    for (const k of activeDays(t)) map.set(k, (map.get(k) || 0) + 1);
   }
   return map;
 }

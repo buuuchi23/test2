@@ -7,7 +7,7 @@ import {
 } from '../data.js';
 import { countByDay, currentStreak, longestStreak } from '../stats.js';
 import { pickWishes, MOODS } from '../picker.js';
-import { openWishEditor, openTaskAdder, openTaskEditor } from '../editors.js';
+import { openWishEditor, openTaskAdder, openTaskEditor, openProgressSheet } from '../editors.js';
 
 export const title = '今日';
 
@@ -62,8 +62,8 @@ export async function render(root, { rerender }) {
   let streakMsg;
   if (doneTodayCount) streakMsg = '今日も達成！この調子です 🎉';
   else if (isRest) streakMsg = '今日は休息日。ゆっくり休んでね 🌙';
-  else if (streak) streakMsg = `今日1つ完了すると、${streak + 1}日連続になります`;
-  else streakMsg = '今日1つ完了して、記録をスタートしよう 🌱';
+  else if (streak) streakMsg = `今日1つ完了するか「すすめた」を押すと、${streak + 1}日連続になります`;
+  else streakMsg = '今日1つ完了するか「すすめた」を押して、記録をスタートしよう 🌱';
   root.append(h('section', { class: 'card streak-card' },
     h('div', { class: 'streak-main' },
       h('div', { class: 'streak-num' },
@@ -177,7 +177,8 @@ export async function render(root, { rerender }) {
   if (!all.length) {
     taskCard.append(h('p', { class: 'muted' }, 'まだタスクはありません。おすすめから選んでみましょう 🌱'));
   } else {
-    taskCard.append(h('ul', { class: 'task-list' }, all.map(taskRow)));
+    taskCard.append(h('ul', { class: 'task-list' }, all.map(taskRow)),
+      h('p', { class: 'muted small task-hint' }, '◯ をタップで完了。途中までなら「すすめた」で今日の分を記録できます。'));
   }
   taskCard.append(h('button', {
     type: 'button', class: 'btn btn-block btn-ghost',
@@ -192,6 +193,15 @@ export async function render(root, { rerender }) {
     if (!done && created < today) {
       const d = parseKey(created);
       sub.push(`${d.getMonth() + 1}/${d.getDate()} から`);
+    }
+    const progress = t.progress || [];
+    const todayProgress = progress.find((p) => p.date === today);
+    const lastProgress = progress[progress.length - 1];
+    let progressLine = null;
+    if (lastProgress && !done) {
+      const d = parseKey(lastProgress.date);
+      const when = lastProgress.date === today ? '今日' : `${d.getMonth() + 1}/${d.getDate()}`;
+      progressLine = h('span', { class: 'task-progress' }, `📝 ${when}：${lastProgress.note || 'すすめた'}`);
     }
     return h('li', { class: done ? 'task done' : 'task' },
       h('button', {
@@ -209,7 +219,13 @@ export async function render(root, { rerender }) {
         onclick: () => openTaskEditor(t, { categories, onSaved: rerender }),
       },
       h('span', { class: 'task-title' }, t.title),
+      progressLine,
       h('span', { class: 'wish-meta' }, sub.filter(Boolean).join('・'))),
+      done ? null : h('button', {
+        type: 'button', class: todayProgress ? 'progress-btn on' : 'progress-btn',
+        'aria-label': todayProgress ? `${t.title}の今日の記録を見る` : `${t.title}を今日すすめた`,
+        onclick: () => openProgressSheet(t, today, { onSaved: rerender }),
+      }, todayProgress ? '✓ すすめた' : '▶ すすめた'),
     );
   }
 

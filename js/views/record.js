@@ -2,7 +2,7 @@
 import { h, chips } from '../ui.js';
 import { todayKey, dateKey, formatDay, keyOfTime } from '../util.js';
 import { loadCategories, loadTasks, loadRestDays } from '../data.js';
-import { countByDay, dayStatus, currentStreak, longestStreak, heatLevel } from '../stats.js';
+import { countByDay, activeDays, dayStatus, currentStreak, longestStreak, heatLevel } from '../stats.js';
 
 export const title = '記録';
 
@@ -59,7 +59,7 @@ export async function render(root, { rerender }) {
     if (key === today) cls.push('today');
     if (future) cls.push('future');
     if (state.selected === key) cls.push('selected');
-    const label = `${formatDay(key)} ${status === 'rest' ? '休息日' : `完了${n}件`}`;
+    const label = `${formatDay(key)} ${status === 'rest' ? '休息日' : `${n}件に取り組んだ`}`;
     cells.push(h('button', {
       type: 'button', class: cls.join(' '), 'aria-label': label, disabled: future,
       onclick: () => { state.selected = state.selected === key ? null : key; rerender(); },
@@ -84,16 +84,22 @@ export async function render(root, { rerender }) {
   // タップした日の中身
   if (state.selected) {
     const key = state.selected;
-    const list = done.filter((t) => keyOfTime(t.completedAt) === key);
+    const list = tasks.filter((t) => activeDays(t).has(key));
     const catName = new Map(categories.map((c) => [c.id, c.name]));
     calCard.append(h('div', { class: 'day-detail' },
       h('h3', {}, formatDay(key)),
       list.length
-        ? h('ul', { class: 'plain-list' }, list.map((t) => h('li', {}, t.title, h('span', { class: 'muted small' }, ` ${catName.get(t.categoryId) || ''}`))))
-        : h('p', { class: 'muted' }, restDays.has(key) ? '休息日でした 🌙' : '完了したタスクはありません'),
+        ? h('ul', { class: 'plain-list' }, list.map((t) => {
+          const finished = t.completedAt && keyOfTime(t.completedAt) === key;
+          const p = (t.progress || []).find((x) => x.date === key);
+          return h('li', {}, finished ? '✅ ' : '📝 ', t.title,
+            h('span', { class: 'muted small' }, ` ${catName.get(t.categoryId) || ''}`),
+            !finished && p && p.note ? h('div', { class: 'muted small' }, p.note) : null);
+        }))
+        : h('p', { class: 'muted' }, restDays.has(key) ? '休息日でした 🌙' : '記録はありません'),
     ));
   } else {
-    calCard.append(h('p', { class: 'muted small center' }, '日付をタップすると、その日にやったことが見られます'));
+    calCard.append(h('p', { class: 'muted small center' }, '日付をタップすると、その日にやったことが見られます（✅完了 📝すすめた）'));
   }
   root.append(calCard);
 
@@ -112,7 +118,7 @@ export async function render(root, { rerender }) {
   });
   period.el.classList.add('tabs', 'tabs-small');
   root.append(h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, '🗂 カテゴリ別の達成数'),
+    h('h2', { class: 'card-title' }, '🗂 カテゴリ別の完了数'),
     period.el,
     inPeriod.length
       ? h('ul', { class: 'bars' }, perCat.map((c) => h('li', { class: 'bar-row' },

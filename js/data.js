@@ -147,7 +147,7 @@ export async function addTask({ title, categoryId, wishId = null }) {
   title = (title || '').trim();
   if (!title) throw new Error('タスクの名前を入れてください');
   if (!categoryId) throw new Error('カテゴリを選んでください');
-  return put('tasks', { id: uid(), wishId, title, categoryId, createdAt: nowISO(), completedAt: null });
+  return put('tasks', { id: uid(), wishId, title, categoryId, createdAt: nowISO(), completedAt: null, progress: [] });
 }
 
 export async function updateTask(id, { title, categoryId }) {
@@ -174,6 +174,22 @@ export async function setTaskDone(id, done) {
   t.completedAt = done ? nowISO() : null;
   await put('tasks', t);
   await refreshLastDone(t.wishId, await getAll('tasks'));
+}
+
+// 「今日すすめた」の記録（1日1件。同じ日にもう一度記録するとメモを上書き）
+export async function saveProgress(id, date, note) {
+  const t = await get('tasks', id);
+  if (!t) return;
+  const progress = (t.progress || []).filter((p) => p.date !== date);
+  progress.push({ date, note: (note || '').trim(), at: nowISO() });
+  progress.sort((a, b) => a.date.localeCompare(b.date));
+  await put('tasks', { ...t, progress });
+}
+
+export async function removeProgress(id, date) {
+  const t = await get('tasks', id);
+  if (!t) return;
+  await put('tasks', { ...t, progress: (t.progress || []).filter((p) => p.date !== date) });
 }
 
 export async function deleteTask(id) {
