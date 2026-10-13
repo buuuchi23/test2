@@ -137,3 +137,52 @@ export async function deleteWish(id) {
 // ---- 初期設定 ----
 export const isSetupDone = () => getMeta('setupDone', false);
 export const markSetupDone = () => setMeta('setupDone', true);
+
+// ---- タスク ----
+export async function loadTasks() {
+  return (await getAll('tasks')).sort(byCreated);
+}
+
+export async function addTask({ title, categoryId, wishId = null }) {
+  title = (title || '').trim();
+  if (!title) throw new Error('タスクの名前を入れてください');
+  if (!categoryId) throw new Error('カテゴリを選んでください');
+  return put('tasks', { id: uid(), wishId, title, categoryId, createdAt: nowISO(), completedAt: null });
+}
+
+export async function updateTask(id, { title, categoryId }) {
+  const t = await get('tasks', id);
+  if (!t) return;
+  title = (title || '').trim();
+  if (!title) throw new Error('タスクの名前を入れてください');
+  await put('tasks', { ...t, title, categoryId });
+}
+
+// やりたいことの「最後にやった日」を、完了済みタスクから計算し直す
+async function refreshLastDone(wishId, tasks) {
+  if (!wishId) return;
+  const w = await get('wishes', wishId);
+  if (!w) return;
+  const times = tasks.filter((t) => t.wishId === wishId && t.completedAt).map((t) => t.completedAt).sort();
+  w.lastDoneAt = times.length ? times[times.length - 1] : null;
+  await put('wishes', w);
+}
+
+export async function setTaskDone(id, done) {
+  const t = await get('tasks', id);
+  if (!t) return;
+  t.completedAt = done ? nowISO() : null;
+  await put('tasks', t);
+  await refreshLastDone(t.wishId, await getAll('tasks'));
+}
+
+export async function deleteTask(id) {
+  const t = await get('tasks', id);
+  if (!t) return;
+  await del('tasks', id);
+  if (t.completedAt) await refreshLastDone(t.wishId, await getAll('tasks'));
+}
+
+// ---- 今日のおすすめ（日ごとに保存） ----
+export const loadDailyPick = (date) => get('dailyPicks', date);
+export const saveDailyPick = (pick) => put('dailyPicks', pick);

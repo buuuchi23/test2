@@ -1,6 +1,6 @@
 // Service Worker：アプリのファイルを端末に保存して、オフラインでも動くようにする。
 // アプリを修正したら、下の VERSION の数字を1つ上げてください（例：v1 → v2）。
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `ikukyu-${VERSION}`;
 
 const FILES = [
@@ -15,6 +15,7 @@ const FILES = [
   './js/data.js',
   './js/db.js',
   './js/editors.js',
+  './js/picker.js',
   './js/ui.js',
   './js/util.js',
   './js/views/today.js',

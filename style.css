@@ -371,3 +371,95 @@ select.input {
 .row-sub { grid-area: sub; font-size: 12px; color: var(--muted); }
 .chev { grid-area: chev; font-size: 22px; color: var(--muted); padding-left: 8px; }
 
+
+/* ===== 切り替えタブ（chips を横いっぱいに） ===== */
+.chips.tabs { flex-wrap: nowrap; background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
+.chips.tabs .chip { flex: 1; border: none; background: transparent; padding: 8px 6px; }
+.chips.tabs .chip.on { background: var(--surface); box-shadow: var(--shadow); color: var(--accent); }
+.chips.tabs .chip.on::before { content: none; }
+
+/* ===== 今日のおすすめ ===== */
+.cond { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.hint { padding: 16px 0 4px; }
+.picks { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+@media (min-width: 700px) {
+  .picks { grid-template-columns: repeat(3, 1fr); }
+}
+.pick {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 12px 12px 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.pick > * { grid-column: 1; }
+.pick-cat { font-size: 12px; color: var(--accent); font-weight: 700; }
+.pick-title { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.pick-memo { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; margin: 2px 0; white-space: pre-wrap; }
+.pick > .pick-action { grid-column: 2; grid-row: 1 / span 4; display: flex; justify-content: flex-end; }
+.pick-state { font-size: 13px; color: var(--green); font-weight: 700; min-height: 40px; display: flex; align-items: center; text-align: right; max-width: 6.5em; }
+@media (min-width: 700px) {
+  .pick { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+  .pick > .pick-action { margin-top: auto; padding-top: 8px; }
+  .pick-state { max-width: none; }
+}
+.reroll { margin-top: 12px; }
+
+/* ===== 今日のタスク ===== */
+.task-list { list-style: none; margin: 8px 0 12px; padding: 0; }
+.task { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); }
+.check {
+  flex-shrink: 0;
+  width: var(--tap);
+  height: var(--tap);
+  margin-left: -8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  touch-action: manipulation;
+}
+.check::before {
+  content: "";
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  box-sizing: border-box;
+}
+.task.done .check::before {
+  content: "✓";
+  border-color: var(--green);
+  background: var(--green);
+  color: var(--surface);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+.task-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.task-title { overflow-wrap: anywhere; }
+.task.done .task-title { color: var(--muted); text-decoration: line-through; }
+
+/* ===== タスク追加のリスト ===== */
+.pick-group { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+.row-plus { color: var(--accent); font-size: 22px; padding: 0 6px; }

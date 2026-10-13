@@ -158,3 +158,18 @@ export function inlineAdd(placeholder, buttonLabel, onSubmit) {
   return h('div', { class: 'inline-add' }, input,
     h('button', { type: 'button', class: 'btn btn-small btn-outline', onclick: submit }, buttonLabel));
 }
+
+// メモの中の URL をリンクにする（それ以外はただの文字）
+export function linkify(text) {
+  const out = [];
+  const re = /https?:\/\/[^\s<>"'「」（）()]+/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(h('a', { href: m[0], target: '_blank', rel: 'noopener noreferrer' }, m[0]));
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}

@@ -1,8 +1,8 @@
-// 編集用のシート（やりたいこと・一括登録）
+// 編集用のシート（やりたいこと・一括登録・タスク）
 import { h, field, chips, select, inlineAdd, openSheet, confirmDialog, toast } from './ui.js';
 import {
   MINUTES, ENERGY, createCategory, saveWish, deleteWish, setExcluded,
-  parseBulk, addWishes,
+  parseBulk, addWishes, addTask, updateTask, deleteTask, minutesLabel,
 } from './data.js';
 
 function categorySelect(categories, value) {
@@ -125,3 +125,108 @@ export function openBulkAdd({ categories, categoryId, onSaved }) {
   setTimeout(() => text.focus(), 250);
 }
 
+
+// タスクを追加（やりたいことリストから選ぶ／新しく入力）
+export function openTaskAdder({ categories, wishes, busyWishIds = new Set(), onSaved }) {
+  let close;
+  const body = h('div', { class: 'form' });
+
+  const fromList = () => {
+    const search = h('input', { type: 'search', class: 'input', placeholder: 'さがす', enterkeyhint: 'search' });
+    const list = h('div', { class: 'pick-list' });
+    const usable = wishes.filter((w) => !w.excluded && !busyWishIds.has(w.id));
+    const draw = () => {
+      const q = search.value.trim().toLowerCase();
+      const hits = usable.filter((w) => !q || w.title.toLowerCase().includes(q));
+      if (!hits.length) {
+        list.replaceChildren(h('p', { class: 'muted small' },
+          usable.length ? '見つかりませんでした' : 'えらべるやりたいことがありません。「新しく入力」から追加できます。'));
+        return;
+      }
+      const groups = categories.map((c) => [c, hits.filter((w) => w.categoryId === c.id)]).filter(([, ws]) => ws.length);
+      list.replaceChildren(...groups.map(([c, ws]) => h('div', {},
+        h('h3', { class: 'pick-group' }, c.name),
+        h('ul', { class: 'wish-list' }, ws.map((w) => h('li', { class: 'wish-row' },
+          h('button', {
+            type: 'button', class: 'wish-main',
+            onclick: async () => {
+              await addTask({ title: w.title, categoryId: w.categoryId, wishId: w.id });
+              toast('今日のタスクに追加しました');
+              close();
+            },
+          },
+          h('span', { class: 'wish-title' }, w.title),
+          w.minutes ? h('span', { class: 'wish-meta' }, `⏱ ${minutesLabel(w.minutes)}`) : null),
+          h('span', { class: 'row-plus', 'aria-hidden': 'true' }, '＋')))),
+      )));
+    };
+    search.addEventListener('input', draw);
+    draw();
+    return [search, list];
+  };
+
+  const fresh = () => {
+    if (!categories.length) {
+      return [noCategoryNotice(categories, () => { close(); openTaskAdder({ categories, wishes, busyWishIds, onSaved }); })];
+    }
+    const title = h('input', { type: 'text', class: 'input', placeholder: '例：郵便局に行く', enterkeyhint: 'done' });
+    const cat = categorySelect(categories);
+    const save = async () => {
+      try {
+        await addTask({ title: title.value, categoryId: cat.value });
+        toast('今日のタスクに追加しました');
+        close();
+      } catch (err) {
+        toast(err.message);
+        title.focus();
+      }
+    };
+    title.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); } });
+    setTimeout(() => title.focus(), 50);
+    return [
+      field('タスク', title),
+      field('カテゴリ', cat),
+      h('button', { type: 'button', class: 'btn btn-block', onclick: save }, '追加する'),
+    ];
+  };
+
+  const content = h('div', { class: 'form' });
+  const tabs = chips([{ v: 'list', label: '📝 リストから選ぶ' }, { v: 'new', label: '✏️ 新しく入力' }], {
+    value: 'list', allowNone: false,
+    onChange: (v) => content.replaceChildren(...(v === 'list' ? fromList() : fresh())),
+  });
+  tabs.el.classList.add('tabs');
+  content.replaceChildren(...fromList());
+  body.append(tabs.el, content);
+  close = openSheet('タスクを追加', body, { onClose: onSaved });
+}
+
+// タスクの編集・削除
+export function openTaskEditor(task, { categories, onSaved }) {
+  let close;
+  const title = h('input', { type: 'text', class: 'input', value: task.title, enterkeyhint: 'done' });
+  const cat = categorySelect(categories, task.categoryId);
+  const save = async () => {
+    try {
+      await updateTask(task.id, { title: title.value, categoryId: cat.value });
+      toast('保存しました');
+      close();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+  close = openSheet('タスクを編集', h('div', { class: 'form' },
+    field('タスク', title),
+    field('カテゴリ', cat),
+    h('button', { type: 'button', class: 'btn btn-block', onclick: save }, '保存する'),
+    h('button', {
+      type: 'button', class: 'btn btn-block btn-ghost text-danger',
+      onclick: async () => {
+        if (!(await confirmDialog(`「${task.title}」を削除しますか？`, { ok: '削除する', danger: true }))) return;
+        await deleteTask(task.id);
+        toast('削除しました');
+        close();
+      },
+    }, '削除する'),
+  ), { onClose: onSaved });
+}
