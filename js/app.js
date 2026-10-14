@@ -102,14 +102,18 @@ function setupServiceWorker() {
   };
 
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
-    if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
-    reg.addEventListener('updatefound', () => {
-      const nw = reg.installing;
+    // 新しいバージョンの準備ができたらお知らせを出す
+    const watch = (nw) => {
       if (!nw) return;
-      nw.addEventListener('statechange', () => {
+      const check = () => {
         if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdate(nw);
-      });
-    });
+      };
+      nw.addEventListener('statechange', check);
+      check();
+    };
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
+    watch(reg.installing); // 登録の時点ですでにダウンロード中のとき
+    reg.addEventListener('updatefound', () => watch(reg.installing));
     // アプリに戻ってきたときに更新を確認する（オフラインなら何もしない）
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && navigator.onLine) reg.update().catch(() => {});
